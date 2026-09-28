@@ -1,8 +1,25 @@
 # Ubuntu 26 这台虚拟机要做的事
 
-机器是 VMware 里的 Ubuntu 26.04.1 桌面，GNOME，Wayland。网卡是 ens33，系统盘是 /dev/sda2。VMware 软件本身不用改，下面全是虚拟机里面要做的。
+机器是 VMware 里的 Ubuntu 26.04.1 桌面，GNOME，Wayland。网卡是 ens33，系统盘是 /dev/sda2。VMware 那边只需要把网络设成桥接，其余全是虚拟机里面要做的。
 
 不写登录密码、出口 IP。
+
+## VMware 设成桥接网络
+
+桥接后虚拟机和主机在同一个局域网，拿到同网段的 IP，别的机器能直接 SSH 进来。以 Windows 上的 VMware Workstation 为例：
+
+1. 在虚拟机上右键，选「设置」，再选「网络适配器」。
+2. 选「桥接模式」。主机用 Wi-Fi 或者是笔记本的话，把「复制物理网络连接状态」也勾上。点确定。
+3. VMware 菜单里选「编辑」，打开「虚拟网络编辑器」，点右下角「更改设置」（要管理员权限）。
+4. 选中 `VMnet0`，把「桥接到」从「自动」改成主机实际上网用的那张网卡（Wi-Fi 或有线）。不要选虚拟网卡或 VPN 网卡。点确定。
+5. 回到 Ubuntu，重连网络并查看 IP：
+
+```bash
+sudo nmcli networking off && sudo nmcli networking on
+ip -4 addr show ens33
+```
+
+看到和主机同网段的地址（比如 `192.168.x.x`）就对了，后面 SSH 就连这个地址。拿不到 IP，多半是第 4 步选错了网卡，换一张再试。
 
 ## 开 SSH
 

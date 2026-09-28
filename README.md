@@ -151,6 +151,42 @@ user_pref("media.peerconnection.enabled", false);
 
 `media.peerconnection.enabled` 关掉是为了不让 WebRTC 报出本机地址。Firefox 如果已经开着，要完全退出再开，语言和字体才会变。
 
+## 繁体输入法
+
+原来只有键盘布局 `xkb cn`，打不出繁体。装注音和新酷音用的拼音，并把拼音默认改成出繁体：
+
+```bash
+sudo apt install -y ibus-chewing ibus-libpinyin
+gsettings set com.github.libpinyin.ibus-libpinyin.libpinyin init-simplified-chinese false
+gsettings set org.gnome.desktop.input-sources show-all-sources true
+gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('ibus', 'libpinyin'), ('ibus', 'chewing')]"
+```
+
+右上角用 Super+空格 轮换：英语、智能拼音（出繁体）、新酷音（注音）。右上角没出现就注销一次。
+
+## 远程桌面用 RDP
+
+Ubuntu 26 的 GNOME 50 自带远程桌面只有 RDP，没有 VNC。开的是当前已登录桌面，端口 3389。人要留在桌面里，注销后这条连接会断。
+
+在桌面会话里的终端跑。用户名用登录用户，密码用登录密码：
+
+```bash
+sudo apt install -y freerdp3-x11
+install -d ~/.local/share/gnome-remote-desktop
+openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 \
+  -subj "/CN=$USER" \
+  -keyout ~/.local/share/gnome-remote-desktop/rdp-tls.key \
+  -out ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+grdctl rdp set-tls-cert ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+grdctl rdp set-tls-key ~/.local/share/gnome-remote-desktop/rdp-tls.key
+grdctl rdp set-credentials "$USER" '登录密码'
+grdctl rdp disable-view-only
+grdctl rdp enable
+systemctl --user enable --now gnome-remote-desktop.service
+```
+
+Windows 上打开「远程桌面连接」，地址填这台机器的局域网 IP。第一次会提示证书不受信任，选连接。
+
 ## 不休眠、不锁屏
 
 空闲不关屏幕，不锁屏。这几条是当前登录用户的设置，要在桌面会话里的终端跑：
@@ -158,6 +194,7 @@ user_pref("media.peerconnection.enabled", false);
 ```bash
 gsettings set org.gnome.desktop.session idle-delay 0
 gsettings set org.gnome.desktop.screensaver lock-enabled false
+gsettings set org.gnome.desktop.lockdown disable-lock-screen true
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
 ```

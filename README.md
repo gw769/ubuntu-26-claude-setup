@@ -14,7 +14,7 @@ Claude 要装桌面版 `claude-desktop`，不要只装命令行。官方软件�
 
 ## 时区和语言
 
-时区用新加坡 `Asia/Singapore`。钟还是东八区。不要用台北：IPPure 的 Claude 检测页把台北和香港、澳门算在一起。
+时区用台北 `Asia/Taipei`。钟是东八区。
 
 语言用繁体 `zh_TW`。浏览器语言写成 `zh-TW, en-US, en`。不要单独的 `zh`，也不要 `zh-CN`。单独的 `zh` 会被当成简体。
 

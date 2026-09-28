@@ -180,3 +180,7 @@ user_pref("media.peerconnection.enabled", false);
 - Claude Desktop 2.7032.0
 - RustDesk 1.4.9
 - Firefox 154（snap）
+
+## VPS
+
+代理这边的 VPS、日本 NAT 加台湾住宅节点的分流、订阅维护，单独写在 [VPS.md](VPS.md)。

@@ -111,7 +111,7 @@ SS 链接 `ss://<base64>@<RESIDENTIAL_HOST>:<PORT>` 里的 base64 解出来是 `
 - `sniff`：入站是 VLESS，sing-box 要先嗅探出 TLS 的 SNI，后面的域名规则才有东西可比。
 - 拒绝 AI 域名的 UDP 443：浏览器会先试 QUIC。QUIC 走 UDP，SS 上游对它不友好，容易卡住或者绕去别的出口。拒掉以后浏览器会退回 TCP，走得就是住宅。
 - 例外直连：大文件和静态资源走本机出口，省住宅流量。当前 10 个：`persistent.oaistatic.com`、`downloads.claude.ai`、`videos.openai.com`，以及几个 OpenAI / Anthropic 官网用的 CDN 主机（Azure blob / azureedge、imgix、ghost.io、b-cdn）。这一条必须放在 AI 规则前面，因为 `oaistatic.com`、`claude.ai` 本身在 AI 集合里。
-- AI 集合：`chatgpt.com`、`chat.com`、`openai.com`、`oaistatic.com`、`oaiusercontent.com`、`sora.com`、`anthropic.com`、`claude.ai`、`claude.com`、`clau.de`、`claudeusercontent.com` 等后缀，加几个精确域名、一个关键词 `chatgpt-async-webps-prod`，以及 OpenAI / Anthropic 公布的 4 个网段（v4 + v6）。一共 39 条左右。三个分流入站用同一份。
+- AI 集合：`chatgpt.com`、`chat.com`、`openai.com`、`oaistatic.com`、`oaiusercontent.com`、`sora.com`、`anthropic.com`、`claude.ai`、`claude.com`、`clau.de`、`claudeusercontent.com` 等后缀，加几个精确域名、一个关键词 `chatgpt-async-webps-prod`，以及 OpenAI / Anthropic 公布的 4 个网段（v4 + v6）。一共 39 条。三个分流入站用同一份。完整列表见下面“GPT + Claude 分流规则（完整）”。
 - 最后一条兜底直连。
 
 改的时候用 jq 在副本上改，别手写整份 json。密码放在临时文件里用 `--rawfile` 读，不要出现在命令行上：
@@ -182,6 +182,231 @@ vless://<UUID>@<NAT_IP>:<NEW_PORT>?encryption=none&flow=xtls-rprx-vision&securit
 ```
 
 上线按下面的“部署步骤”走。
+
+## GPT + Claude 分流规则（完整）
+
+下面两份是线上实际在用的规则，只删了节点、密钥和我们自己的 IP。
+
+### 服务端 sing-box（分流入站上）
+
+nat2 的三个分流入站和 DMIT 的四个分流入站（ATT / 夏威夷 / Cox / Wave）用的是同一份 AI 集合：6 个精确域名、28 个后缀、1 个关键词、4 个网段，一共 39 条。下面以 `nat2-tw-in` 为例，按顺序是：嗅探、拒 AI 的 QUIC、例外直连、AI 走住宅、其余直连。
+
+```json
+{
+  "route": {
+    "rules": [
+      {
+        "inbound": [
+          "nat2-tw-in"
+        ],
+        "action": "sniff"
+      },
+      {
+        "inbound": [
+          "nat2-tw-in"
+        ],
+        "network": "udp",
+        "port": 443,
+        "domain": [
+          "openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+          "openaicomproductionae4b.blob.core.windows.net",
+          "production-openaicom-storage.azureedge.net",
+          "anthropic-com.ghost.io",
+          "anthropic.com.cdn.cloudflare.net",
+          "servd-anthropic-website.b-cdn.net"
+        ],
+        "domain_suffix": [
+          "chat.com",
+          "chatgpt.com",
+          "crixet.com",
+          "oaistatic.com",
+          "oaiusercontent.com",
+          "openai.com",
+          "openaiapi-site.azureedge.net",
+          "openaicom.imgix.net",
+          "sora.com",
+          "openai.com.cdn.cloudflare.net",
+          "anthropic.com",
+          "anthropic.com.cn",
+          "antspace.dev",
+          "clau.de",
+          "claude.ai",
+          "claude.app",
+          "claude.com",
+          "claude.new",
+          "claude.site",
+          "claudemcpclient.com",
+          "claudemcpcontent.com",
+          "claudepages.dev",
+          "claudestudio.com",
+          "claudeusercontent.com",
+          "anthropic.team",
+          "chatbotclaude.com",
+          "interface.feedback",
+          "sillylittleguy.org"
+        ],
+        "domain_keyword": [
+          "chatgpt-async-webps-prod"
+        ],
+        "action": "reject"
+      },
+      {
+        "inbound": [
+          "nat2-tw-in"
+        ],
+        "domain": [
+          "persistent.oaistatic.com",
+          "downloads.claude.ai",
+          "videos.openai.com",
+          "openaicomproductionae4b.blob.core.windows.net",
+          "production-openaicom-storage.azureedge.net",
+          "openaiapi-site.azureedge.net",
+          "openaicom.imgix.net",
+          "openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+          "anthropic-com.ghost.io",
+          "servd-anthropic-website.b-cdn.net"
+        ],
+        "outbound": "direct-out"
+      },
+      {
+        "inbound": [
+          "nat2-tw-in"
+        ],
+        "domain": [
+          "openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+          "openaicomproductionae4b.blob.core.windows.net",
+          "production-openaicom-storage.azureedge.net",
+          "anthropic-com.ghost.io",
+          "anthropic.com.cdn.cloudflare.net",
+          "servd-anthropic-website.b-cdn.net"
+        ],
+        "domain_suffix": [
+          "chat.com",
+          "chatgpt.com",
+          "crixet.com",
+          "oaistatic.com",
+          "oaiusercontent.com",
+          "openai.com",
+          "openaiapi-site.azureedge.net",
+          "openaicom.imgix.net",
+          "sora.com",
+          "openai.com.cdn.cloudflare.net",
+          "anthropic.com",
+          "anthropic.com.cn",
+          "antspace.dev",
+          "clau.de",
+          "claude.ai",
+          "claude.app",
+          "claude.com",
+          "claude.new",
+          "claude.site",
+          "claudemcpclient.com",
+          "claudemcpcontent.com",
+          "claudepages.dev",
+          "claudestudio.com",
+          "claudeusercontent.com",
+          "anthropic.team",
+          "chatbotclaude.com",
+          "interface.feedback",
+          "sillylittleguy.org"
+        ],
+        "domain_keyword": [
+          "chatgpt-async-webps-prod"
+        ],
+        "ip_cidr": [
+          "199.47.142.0/23",
+          "2604:f20::/32",
+          "160.79.104.0/21",
+          "2607:6bc0::/32"
+        ],
+        "outbound": "res-tw"
+      },
+      {
+        "inbound": [
+          "nat2-tw-in"
+        ],
+        "outbound": "direct-out"
+      }
+    ]
+  }
+}
+```
+
+几点：
+
+- 例外直连那条在 AI 那条前面，所以里面和 AI 集合重复的几个 CDN 主机（Azure blob / azureedge、imgix、ghost.io、b-cdn、azurefd）实际走本机出口。`anthropic.com.cdn.cloudflare.net` 不在例外里，还是走住宅。
+- `downloads.claude.ai`、`videos.openai.com`、`persistent.oaistatic.com` 是大文件和静态资源，特意放本机出口，省住宅流量。
+- 网段是 OpenAI（`199.47.142.0/23`、`2604:f20::/32`）和 Anthropic（`160.79.104.0/21`、`2607:6bc0::/32`）公布的地址，只对直接连 IP、没有域名的请求起作用。
+- 第三方服务故意不放进来：Stripe、Sentry、Intercom、Auth0、Arkose、LiveKit、Google Cloud Storage、Datadog 等。它们不看你是不是住宅 IP，放进来只是白吃住宅流量。这些走节点的机房出口。
+- 其它 AI（Gemini、Copilot、Cursor、Perplexity 等）也不在集合里，同样走机房出口。
+
+### 客户端 Clash（`/sub-self` 里的规则）
+
+客户端不区分住宅不住宅，只负责把这些交给 `Proxy`，选哪个分流节点就在哪个节点上按上面的规则分。顺序是：
+
+```yaml
+rules:
+  # 1. 最上面：自己的直连 / 指定例外（具体条目略）
+  - IP-CIDR,<某个国内服务器>/32,DIRECT,no-resolve
+  - DOMAIN,connectivitycheck.gstatic.com,DIRECT
+  # ……（系统联网检测、Steam 国内 CDN 等直连）
+
+  # 2. AI 域名的 QUIC 直接拒绝，逼浏览器退回 TCP
+  - AND,((NETWORK,UDP),(DST-PORT,443),(OR,((DOMAIN-SUFFIX,chatgpt.com),(DOMAIN-SUFFIX,openai.com),(DOMAIN-SUFFIX,oaistatic.com),(DOMAIN-SUFFIX,oaiusercontent.com),(DOMAIN-SUFFIX,chat.com),(DOMAIN-SUFFIX,sora.com)))),REJECT
+  - AND,((NETWORK,UDP),(DST-PORT,443),(OR,((DOMAIN-SUFFIX,claude.ai),(DOMAIN-SUFFIX,claude.com),(DOMAIN-SUFFIX,anthropic.com),(DOMAIN-SUFFIX,claudeusercontent.com)))),REJECT
+
+  # 3. GPT + Claude：和服务端同一份 39 条，全部交给 Proxy
+  - DOMAIN-SUFFIX,chat.com,Proxy
+  - DOMAIN-SUFFIX,chatgpt.com,Proxy
+  - DOMAIN-SUFFIX,crixet.com,Proxy
+  - DOMAIN-SUFFIX,oaistatic.com,Proxy
+  - DOMAIN-SUFFIX,oaiusercontent.com,Proxy
+  - DOMAIN-SUFFIX,openai.com,Proxy
+  - DOMAIN-SUFFIX,openaiapi-site.azureedge.net,Proxy
+  - DOMAIN-SUFFIX,openaicom.imgix.net,Proxy
+  - DOMAIN-SUFFIX,sora.com,Proxy
+  - DOMAIN-KEYWORD,chatgpt-async-webps-prod,Proxy
+  - IP-CIDR,199.47.142.0/23,Proxy,no-resolve
+  - IP-CIDR6,2604:f20::/32,Proxy,no-resolve
+  - DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net,Proxy
+  - DOMAIN,openaicomproductionae4b.blob.core.windows.net,Proxy
+  - DOMAIN,production-openaicom-storage.azureedge.net,Proxy
+  - DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net,Proxy
+  - DOMAIN-SUFFIX,anthropic.com,Proxy
+  - DOMAIN-SUFFIX,anthropic.com.cn,Proxy
+  - DOMAIN-SUFFIX,antspace.dev,Proxy
+  - DOMAIN-SUFFIX,clau.de,Proxy
+  - DOMAIN-SUFFIX,claude.ai,Proxy
+  - DOMAIN-SUFFIX,claude.app,Proxy
+  - DOMAIN-SUFFIX,claude.com,Proxy
+  - DOMAIN-SUFFIX,claude.new,Proxy
+  - DOMAIN-SUFFIX,claude.site,Proxy
+  - DOMAIN-SUFFIX,claudemcpclient.com,Proxy
+  - DOMAIN-SUFFIX,claudemcpcontent.com,Proxy
+  - DOMAIN-SUFFIX,claudepages.dev,Proxy
+  - DOMAIN-SUFFIX,claudestudio.com,Proxy
+  - DOMAIN-SUFFIX,claudeusercontent.com,Proxy
+  - IP-CIDR,160.79.104.0/21,Proxy,no-resolve
+  - IP-CIDR6,2607:6bc0::/32,Proxy,no-resolve
+  - DOMAIN,anthropic-com.ghost.io,Proxy
+  - DOMAIN,anthropic.com.cdn.cloudflare.net,Proxy
+  - DOMAIN,servd-anthropic-website.b-cdn.net,Proxy
+  - DOMAIN-SUFFIX,anthropic.team,Proxy
+  - DOMAIN-SUFFIX,chatbotclaude.com,Proxy
+  - DOMAIN-SUFFIX,interface.feedback,Proxy
+  - DOMAIN-SUFFIX,sillylittleguy.org,Proxy
+
+  # 4. 其它 AI / 第三方服务也走 Proxy（节点上走机房出口，不吃住宅），略
+
+  # 5. 最后：国内直连，其余代理
+  - GEOSITE,CN,❌不代理
+  - GEOIP,CN,❌不代理
+  - MATCH,⚓️其他流量
+```
+
+- 客户端的 QUIC 拒绝和服务端那条是两道保险。客户端先拒，UDP 根本不出本机。
+- 第 4 部分在客户端还有不少：`ai.com`、LiveKit、Stripe、Sentry、Intercom、Auth0、Arkose、Statsig、Datadog、`storage.googleapis.com`、MCP 相关域名，以及 Gemini / Copilot / Cursor / Perplexity 等。它们在客户端也是 `Proxy`，到了节点上不命中服务端 AI 集合，就走机房出口。
+- `GEOSITE,CN` / `GEOIP,CN` 放在所有 AI 规则后面，避免某个 AI 域名被国内 IP 段误判成直连。
 
 ## 订阅服务和流量显示
 

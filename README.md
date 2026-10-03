@@ -74,6 +74,7 @@ sudo usermod -aG kvm $USER
 ## 时区和语言
 
 时区用台北 `Asia/Taipei`。钟是东八区。
+如果这台要看起来像日本，时区应对 `Asia/Tokyo`（东九区），记在 [VPS.md](VPS.md) 的「焚决检查」。这次先不改。
 
 ```bash
 sudo timedatectl set-timezone Asia/Taipei

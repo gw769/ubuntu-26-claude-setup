@@ -64,6 +64,22 @@ tun:
 `route-exclude-address` 让阿里云 / frp / deepworm（`106.14.224.66`）在 TUN+全局时也绕开 Clash，走本机直连。`inet6-address` 把电脑自己的 IPv6 收进 TUN。这条链路上服务器没有公网 IPv6，不收的话，GPT / Claude 会看到家里的 IPv6，IPv4 却是台湾。`inet6-address` 在这份 mihomo 里必须写成列表，写成一行字符串会校验失败。`strict-route` 一起开着。
 
 
+
+## 焚决检查（非出口 IP）
+
+2026-10-03 夜里查的是「除了出口 IP 以外，还会不会露」。不是改指纹的做法。
+
+2026-10-03 大约 23:00 之前，订阅里的 Clash `tun` 没有 `inet6-address`。客户端开 TUN 再选全局时，规则不生效，电脑自己的 IPv6 可以绕开 Clash，直接连到 Claude / GPT。那边看到的就是家里的 IPv6，IPv4 才是台湾。服务器这条路本身没有公网 IPv6：彰化那台没有（只有 NAT），nat2 只有 ULA。所以不是服务器再拿出一个 IPv6，是电脑自己漏出去的。
+
+同一晚，DMIT 三份 yaml（`:58888/sub-self`、`:58889/sub-self`、`:58890/sub`）和 38 上的 `/sub` 都加上了 `inet6-address`（`fdfe:dcba:9876::1/126`，必须写成列表）、`strict-route: true`，以及 `route-exclude-address`：`47.250.128.0/24`、`106.14.224.66/32`（deepworm）、`8.130.160.161/32`。`dns.ipv6` 仍是 `false`。
+
+DNS 在那之前用的是国内递归：`default-nameserver` 和 `nameserver` 是 `223.5.5.5`（阿里）和 `119.29.29.29`（DNSPod），`nameserver-policy` 里的 `geosite:cn` 也指这两台。国内递归可以靠 ECS 带出中国前缀。2026-10-03 大约 23:27，这四份订阅改成只剩 `1.1.1.1` 和 `8.8.8.8`（`default-nameserver`、`nameserver`、`geosite:cn` 都是）。`fallback` 本来就是 `8.8.8.8` 和 `1.1.1.1`，没动。
+
+Ubuntu 那篇还写着时区 `Asia/Taipei`、语言 `zh_TW`，钟是东八区。日本是 `Asia/Tokyo`，东九区。机器如果要看起来像日本，这两边对不上。这次没有改那台虚拟机。
+
+服务器上看不到的：浏览器 WebRTC、Accept-Language、CMD / PowerShell 是否绕过代理、Claude 桌面有没有走代理、支付 BIN、硬件标识。这些要在那台电脑上自己看。
+
+
 ## 设计原则
 
 - 客户端只在 `Proxy` 一个组里选节点。别的组只是 `Proxy` / `DIRECT` 二选一。

@@ -2,17 +2,67 @@
 
 2026-09 下旬实际做过的事。主线是在日本 NAT 机上加一个“分流节点”：GPT / Claude 走台湾 HiNet 住宅代理，别的流量走 NAT 机自己的出口。
 
-不写密码、UUID、Reality 公私钥、short_id、SS 密码、服务器 IP、住宅代理的域名、订阅地址。下面全用占位符，比如 `<UUID>`、`<PASSWORD>`、`<NAT_IP>`。
+不写密码、UUID、Reality 公私钥、short_id、SS 密码。彰化那台只用 DDNS 主机名，不写解析出来的 IP，也不写 SSH 密码。订阅端口写在下面。
 
 ## 整体布局
 
 | 机器 | 系统 / 程序 | 用途 |
 |---|---|---|
-| DMIT 洛杉矶（主 VPS） | Debian 13，sing-box 1.11，systemd | 自己的节点；分流节点 ATT / 夏威夷 / Cox / Wave（100G）；出订阅 `/sub-self`（Clash yaml 和 Shadowrocket vless 列表） |
-| nat2 日本 NAT | Alpine，sing-box 1.13，openrc | 只开了一段转发端口。分流节点 `nat2-日本Home（100G）`、`nat2-台湾Hinet（100G）`、`nat2-US机房固定IP` |
+| DMIT 洛杉矶（主 VPS） | Debian 13，sing-box 1.11，systemd | 自己的节点 `dmit`；分流节点 ATT / 夏威夷 / Cox / Wave（100G）。订阅见下面「2026-10 更新」：`:58888/sub-self`、`:58889/sub-self`、`:58890/sub` |
+| nat2 日本 NAT | Alpine，sing-box 1.13，openrc | 只开了一段转发端口。分流节点 `nat2-日本Home（100G）`、`nat2-台湾彰化（100G）`（在用）、`nat2-台湾Hinet（100G）`（上游已挂，留着别用）、`nat2-US机房固定IP` |
 | 中转机 `<RELAY_IP>` | Alpine，busybox | 另一份订阅 `/sub`，用 `nc -lk -e` 跑一个 shell 脚本出文件 |
 
 “（100G）”的意思是 AI 出口用的是按流量计费的住宅代理，一个月 100G。
+
+
+## 2026-10 更新：彰化住宅、三份订阅、TUN 防漏
+
+旧的 `nat2-台湾Hinet（100G）` 还在订阅里，不要再用。它的上游 `hinet.7li7li.vip:14000` 从大约 2026-09-28 起连接被拒绝。
+
+### 彰化（在用的台湾住宅）
+
+- 主机名只用 `hinetiw0k.yooddns.stream`。这是动态 IP 的 DDNS，配置里不要写死当时解析到的 A 记录，连的时候再解析。
+- 这台上面跑 sing-box，VLESS Reality 听 `:48888`。管理 SSH 是 `:10505`。密码不写在这里。
+- 出口是 HiNet。这台没有公网 IPv6，里面只有 NAT 地址 `172.16.0.105`。
+
+### nat2 上的分流
+
+- 入站 `nat2-ch-in`，端口 `:21045`。做法和日本 Home 一样：复制现成的 Reality 入站，只改 tag 和端口。
+- 出站 `res-ch` 的 `server` 是 `hinetiw0k.yooddns.stream`，端口 `48888`。不是 IP。
+- 规则和日本 Home 同一套：GPT / Claude 走彰化，其余走 nat2 自己的出口。
+- 订阅里的名字是 `nat2-台湾彰化（100G）`。
+
+### DMIT 上的三份订阅（`179.255.106.251`）
+
+都是 systemd 里的 python 小服务。Clash 的 User-Agent 给 yaml，Shadowrocket 给 vless。
+
+| 端口和路径 | 服务 | 内容 |
+|---|---|---|
+| `:58888/sub-self` | `subscription-58888` | 完整列表。彰化加在 `Proxy` 和 `GLOBAL` 里，紧挨着旧的 Hinet 后面。带用量响应头 |
+| `:58889/sub-self` | `subscription-58889` | 只有台湾：旧 Hinet + 彰化。不带用量头（流量不在 DMIT 上） |
+| `:58890/sub` | `subscription-58890` | 只有普通节点 `dmit`（`:48888`），没有那些（100G）分流节点。路径是 `/sub`，不是 `/sub-self`。用量头开着，读和 `:58888` 同一个采集结果 |
+
+### Clash 的 tun（三份 yaml 都有）
+
+`enable` 仍是 `false`，不替用户打开 TUN。客户端自己开 TUN、又选全局时，规则不生效，所以把这两项写进订阅：
+
+```yaml
+tun:
+  enable: false
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
+  inet6-address:
+  - fdfe:dcba:9876::1/126
+  strict-route: true
+  route-exclude-address:
+  - 47.250.128.0/24
+  - 106.14.224.66/32
+  - 8.130.160.161/32
+```
+
+`route-exclude-address` 让阿里云 / frp / deepworm（`106.14.224.66`）在 TUN+全局时也绕开 Clash，走本机直连。`inet6-address` 把电脑自己的 IPv6 收进 TUN。这条链路上服务器没有公网 IPv6，不收的话，GPT / Claude 会看到家里的 IPv6，IPv4 却是台湾。`inet6-address` 在这份 mihomo 里必须写成列表，写成一行字符串会校验失败。`strict-route` 一起开着。
+
 
 ## 设计原则
 
